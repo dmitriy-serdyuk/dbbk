@@ -16,7 +16,7 @@ from bokeh.themes import Theme
 import numpy
 from bokeh.models.widgets import TableColumn, Button
 
-from dbbk import AddLine, Figure, MyDataTable
+from dbbk import AddLine, Figure, DragDataTable
 
 
 class DataContainer(object):
@@ -101,7 +101,7 @@ class DataContainer(object):
         columns = [
             TableColumn(field="model", title="Model"),
             TableColumn(field="experiment", title="Experiment")]
-        data_table = MyDataTable(
+        data_table = DragDataTable(
             source=datastreams_source, columns=columns, width=400, height=280)
 
         # TODO: make interval configurable, add refresh button

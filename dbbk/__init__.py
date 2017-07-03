@@ -1,1 +1,1 @@
-from .widgets import AddLine, MyDataTable, MyPlot, Figure
+from .widgets import AddLine, DragDataTable, DropPlot, Figure

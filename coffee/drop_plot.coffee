@@ -3,8 +3,8 @@ import * as p from "core/properties"
 import {PlotView, Plot} from "models/plots/plot"
 import {Signal} from "core/signaling"
 
-export class MyPlotView extends PlotView
-    className: "MyPlotView"
+export class DropPlotView extends PlotView
+    className: "DropPlotView"
 
     initialize: (options) ->
         super(options)
@@ -30,6 +30,6 @@ export class MyPlotView extends PlotView
                 "model_id": @model.ref().id,
                 "data": ev.dataTransfer.getData("text")}})
 
-export class MyPlot extends Plot
-    type: 'MyPlot'
-    default_view: MyPlotView
+export class DropPlot extends Plot
+    type: 'DropPlot'
+    default_view: DropPlotView

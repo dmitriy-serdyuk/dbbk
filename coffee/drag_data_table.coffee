@@ -3,7 +3,7 @@ import * as p from "core/properties"
 import {DataTable, DataTableView} from "models/widgets/data_table"
 
 
-export class MyDataTableView extends DataTableView
+export class DragDataTableView extends DataTableView
     initialize: (options) ->
         super(options)
         @render()
@@ -44,6 +44,6 @@ export class MyDataTableView extends DataTableView
         ev.preventDefault()
 
             
-export class MyDataTable extends DataTable
-    type: "MyDataTable"
-    default_view: MyDataTableView
+export class DragDataTable extends DataTable
+    type: "DragDataTable"
+    default_view: DragDataTableView

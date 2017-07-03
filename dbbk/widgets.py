@@ -7,13 +7,13 @@ from bokeh.models.widgets import DataTable, DateFormatter, TableColumn, Button
 from bokeh.plotting import Figure
 
 
-class MyDataTable(DataTable):
-    __implementation__ = '../coffee/my_data_table.coffee'
+class DragDataTable(DataTable):
+    __implementation__ = '../coffee/drag_data_table.coffee'
 
 
-class MyPlot(Plot):
+class DropPlot(Plot):
     __implementation__ = (dirname(realpath(__file__)) +
-                          '/../coffee/my_plot.coffee')
+                          '/../coffee/drop_plot.coffee')
 
 
 class AddLine(Event):
@@ -25,5 +25,5 @@ class AddLine(Event):
 
 
 del MetaModel.model_class_reverse_map['Figure']
-Figure = type('Figure', (MyPlot, Figure), dict(Figure.__dict__))
+Figure = type('Figure', (DropPlot, Figure), dict(Figure.__dict__))
 Figure.__view_model__ = "MyPlot"
