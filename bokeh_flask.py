@@ -13,8 +13,10 @@ from bokeh.layouts import column, row
 from bokeh.models import ColumnDataSource, Slider
 from bokeh.server.server import Server
 from bokeh.themes import Theme
-import numpy
 from bokeh.models.widgets import TableColumn, Button
+from bokeh.util.browser import view
+from tornado.wsgi import WSGIContainer
+from tornado.web import FallbackHandler
 
 from dbbk import AddLine, Figure, DragDataTable
 
@@ -22,12 +24,12 @@ from dbbk import AddLine, Figure, DragDataTable
 class DataContainer(object):
     def __init__(self):
         self.data_frame = pandas.DataFrame(
-            columns=['iteration', 'value', 'model', 'experiment'])
+            columns=['iteration', 'value', 'model', 'variable'])
         self.experiments = []
 
-    def get_points(self, model, experiment):
+    def get_points(self, model, variable):
         filtered = self.data_frame[(self.data_frame.model == model) &
-                                   (self.data_frame.experiment == experiment)]
+                                   (self.data_frame.variable == variable)]
         return (filtered['iteration'].as_matrix(),
                 filtered['value'].as_matrix())
 
@@ -35,23 +37,23 @@ class DataContainer(object):
         def callback(ev):
             data = json.loads(ev.data)
             model = data['model']
-            experiment = data['experiment']
+            variable = data['variable']
 
-            iteration, value = self.get_points(model, experiment)
+            iteration, value = self.get_points(model, variable)
             src = ColumnDataSource(dict(iteration=iteration, value=value))
 
             plot.line('iteration', 'value', source=src)
             if plot in data_sources:
-                data_sources[plot].append((src, model, experiment))
+                data_sources[plot].append((src, model, variable))
             else:
-                data_sources[plot] = [(src, model, experiment)]
+                data_sources[plot] = [(src, model, variable)]
         return callback
 
     def add_plot_callback(self, plots_layout, data_sources):
         def callback():
             plot = Figure(x_axis_type='linear', y_range=(0, 25),
-                          y_axis_label='Temperature (Celsius)',
-                          title="Sea Surface Temperature at 43.18, -70.43")
+                          y_axis_label='value',
+                          x_axis_label='iteration')
             plot.on_event(AddLine, self.add_line_callback(plot, data_sources))
             plots_layout.children.append(plot)
         return callback
@@ -69,9 +71,9 @@ class DataContainer(object):
     def add_update_data_callback(self, data_sources, datastreams_source):
         def update_data():
             for plot, plot_properties in data_sources.items():
-                for source, model, experiment in plot_properties:
+                for source, model, variable in plot_properties:
                     new_data = {}
-                    iteration, value = self.get_points(model, experiment)
+                    iteration, value = self.get_points(model, variable)
                     len_diff = (len(iteration) -
                                 len(source.data['iteration']))
                     if len_diff > 0:
@@ -84,15 +86,15 @@ class DataContainer(object):
                 new_data = {
                     'model':
                         [model for model, _ in self.experiments[-len_diff:]],
-                    'experiment': [experiment for _, experiment
-                                   in self.experiments[-len_diff:]]}
+                    'variable': [variable for _, variable
+                                 in self.experiments[-len_diff:]]}
                 datastreams_source.stream(new_data)
         return update_data
 
     def modify_doc(self, doc):
         data_sources = {}
         datastreams_source = ColumnDataSource(
-            dict(model=[], experiment=[]))
+            dict(model=[], variable=[]))
         slider = Slider(start=0, end=30, value=0, step=1, title="Smoothing")
         # TODO: uncomment when smoothing is fixed
         #slider.on_change(
@@ -100,7 +102,7 @@ class DataContainer(object):
 
         columns = [
             TableColumn(field="model", title="Model"),
-            TableColumn(field="experiment", title="Experiment")]
+            TableColumn(field="variable", title="Variable")]
         data_table = DragDataTable(
             source=datastreams_source, columns=columns, width=400, height=280)
 
@@ -131,43 +133,38 @@ class DataContainer(object):
                     grid_line_color: white
         """))
 
-# TODO: make port configurable
-PORT = 8080
-
-
-flask_app = Flask(__name__)
-
-
-data_container = DataContainer()
-bokeh_app = Application(FunctionHandler(data_container.modify_doc))
-
-io_loop = IOLoop.current()
-
-server = Server({'/bkapp': bokeh_app}, io_loop=io_loop, 
-                allow_websocket_origin=["localhost:{}".format(PORT)], port=PORT)
-
-server.start()
-
-
-@flask_app.route('/', methods=['GET'])
-def bkapp_page():
-    script = autoload_server(url='http://localhost:{}/bkapp'.format(PORT))
-    return render_template("embed.html", script=script, template="Flask")
-
-
-@flask_app.route('/add/<model>/<experiment>/<x>/<y>', methods=['GET'])
-def add_data(model, experiment, x, y):
-    new_data = dict(iteration=x, value=y, model=model, experiment=experiment)
-    data_container.data_frame.loc[len(data_container.data_frame)] = new_data
-    if (model, experiment) not in data_container.experiments:
-        data_container.experiments.append((model, experiment))
-    return "", 200
-
 
 if __name__ == '__main__':
-    from tornado.wsgi import WSGIContainer
-    from tornado.web import FallbackHandler
-    from bokeh.util.browser import view
+    # TODO: make port configurable
+    PORT = 8080
+
+    flask_app = Flask(__name__)
+
+    data_container = DataContainer()
+    bokeh_app = Application(FunctionHandler(data_container.modify_doc))
+
+    io_loop = IOLoop.current()
+
+    server = Server({'/bkapp': bokeh_app}, io_loop=io_loop,
+                    allow_websocket_origin=["localhost:{}".format(PORT)],
+                    port=PORT)
+
+    server.start()
+
+
+    @flask_app.route('/', methods=['GET'])
+    def bkapp_page():
+        script = autoload_server(url='http://localhost:{}/bkapp'.format(PORT))
+        return render_template("embed.html", script=script, template="Flask")
+
+
+    @flask_app.route('/add/<model>/<variable>/<x>/<y>', methods=['GET'])
+    def add_data(model, variable, x, y):
+        new_data = dict(iteration=x, value=y, model=model, variable=variable)
+        data_container.data_frame.loc[len(data_container.data_frame)] = new_data
+        if (model, variable) not in data_container.experiments:
+            data_container.experiments.append((model, variable))
+        return "", 200
 
     print('Start server on http://localhost:{}/'.format(PORT))
 
