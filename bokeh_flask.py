@@ -42,7 +42,9 @@ class DataContainer(object):
             iteration, value = self.get_points(model, variable)
             src = ColumnDataSource(dict(iteration=iteration, value=value))
 
-            plot.line('iteration', 'value', source=src)
+            plot.line('iteration', 'value', source=src,
+                      legend="{}: {}".format(model, variable))
+            plot.legend.click_policy = "hide"
             if plot in data_sources:
                 data_sources[plot].append((src, model, variable))
             else:
