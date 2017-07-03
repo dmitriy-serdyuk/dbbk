@@ -26,4 +26,4 @@ class AddLine(Event):
 
 del MetaModel.model_class_reverse_map['Figure']
 Figure = type('Figure', (DropPlot, Figure), dict(Figure.__dict__))
-Figure.__view_model__ = "MyPlot"
+Figure.__view_model__ = "DropPlot"
