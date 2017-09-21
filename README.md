@@ -33,3 +33,9 @@ Click 'Add Plot' button.
 Wait a couple of seconds and drag a table row to the plot.
 
 ![screen_shot](https://raw.githubusercontent.com/dmitriy-serdyuk/dbbk/master/screenshot.png)
+
+Related projects
+----------------
+
+- visdom
+- tensorflow
