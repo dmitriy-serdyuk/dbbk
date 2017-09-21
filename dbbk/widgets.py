@@ -3,12 +3,13 @@ from os.path import dirname, realpath
 from bokeh.events import Event
 from bokeh.model import MetaModel
 from bokeh.models.plots import Plot
-from bokeh.models.widgets import DataTable, DateFormatter, TableColumn, Button
+from bokeh.models.widgets.tables import DataTable
 from bokeh.plotting import Figure
 
 
 class DragDataTable(DataTable):
-    __implementation__ = '../coffee/drag_data_table.coffee'
+    __implementation__ = (dirname(realpath(__file__)) +
+                          '/../coffee/drag_data_table.coffee')
 
 
 class DropPlot(Plot):
@@ -24,6 +25,7 @@ class AddLine(Event):
         self.data = data
 
 
+# Hack the figure to use our fancy dropable figure
 del MetaModel.model_class_reverse_map['Figure']
 Figure = type('Figure', (DropPlot, Figure), dict(Figure.__dict__))
 Figure.__view_model__ = "DropPlot"

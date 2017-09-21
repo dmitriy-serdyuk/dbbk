@@ -1,6 +1,6 @@
 import * as p from "core/properties"
 
-import {DataTable, DataTableView} from "models/widgets/data_table"
+import {DataTable, DataTableView} from "models/widgets/tables/data_table"
 
 
 export class DragDataTableView extends DataTableView
@@ -23,7 +23,7 @@ export class DragDataTableView extends DataTableView
         @add_callbacks()
 
     add_callbacks: () ->
-        rows = @$el.find('.bk-slick-row')
+        rows = $(@el).find('.slick-row')
         for row, i in rows
             row.setAttribute("draggable", "true")
             do (i, row) =>

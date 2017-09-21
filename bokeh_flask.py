@@ -153,12 +153,10 @@ if __name__ == '__main__':
 
     server.start()
 
-
     @flask_app.route('/', methods=['GET'])
     def bkapp_page():
         script = autoload_server(url='http://localhost:{}/bkapp'.format(PORT))
         return render_template("embed.html", script=script, template="Flask")
-
 
     @flask_app.route('/add/<model>/<variable>/<x>/<y>', methods=['GET'])
     def add_data(model, variable, x, y):
