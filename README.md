@@ -31,3 +31,5 @@ http://localhost:8080/add/experiment1/variable1/2/2
 Click 'Add Plot' button.
 
 Wait a couple of seconds and drag a table row to the plot.
+
+![Screen shot][https://raw.githubusercontent.com/dmitriy-serdyuk/dbbk/master/screenshot.png]
