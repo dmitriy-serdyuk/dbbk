@@ -8,7 +8,7 @@ from tornado.ioloop import IOLoop
 
 from bokeh.application import Application
 from bokeh.application.handlers import FunctionHandler
-from bokeh.embed import autoload_server
+from bokeh.embed import server_document
 from bokeh.layouts import column, row
 from bokeh.models import ColumnDataSource, Slider
 from bokeh.server.server import Server
@@ -155,7 +155,7 @@ if __name__ == '__main__':
 
     @flask_app.route('/', methods=['GET'])
     def bkapp_page():
-        script = autoload_server(url='http://localhost:{}/bkapp'.format(PORT))
+        script = server_document(url='http://localhost:{}/bkapp'.format(PORT))
         return render_template("embed.html", script=script, template="Flask")
 
     @flask_app.route('/add/<model>/<variable>/<x>/<y>', methods=['GET'])
