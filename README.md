@@ -9,6 +9,14 @@ Installation
 1. Get bokeh, pandas, flask, nodejs with your favourite package manager.
 2. Clone this repo
 
+Philosophy
+----------
+
+- Too much information is worse than
+- Data is shared, visualization is personal.
+
+  A new window may have different plot arrangements, experiments plotted, etc.
+
 Run
 ---
 

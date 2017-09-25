@@ -24,9 +24,9 @@ class MainHandler(RequestHandler):
     @gen.coroutine
     def get(self):
         session = yield self.get_session()
-        model = session.document.roots[0]
+        root_model = session.document.roots[0]
         script = server_session(
-            model, session.id,
+            root_model, session.id,
             url='http://localhost:{}/bkapp'.format(self.port))
         self.write(render("templates/embed.html", script=script, template="Flask"))
         self.finish()
@@ -38,12 +38,12 @@ class AddHandler(RequestHandler):
     def initialize(self, data_container):
         self.data_container = data_container
 
-    def get(self, model, variable, x, y):
+    def get(self, experiment, variable, x, y):
         x = float(x)
         y = float(y)
-        new_data = dict(iteration=x, value=y, model=model, variable=variable)
+        new_data = dict(iteration=x, value=y, experiment=experiment, variable=variable)
         self.data_container.data_frame.loc[len(self.data_container.data_frame)] = new_data
-        if (model, variable) not in self.data_container.experiments:
-            self.data_container.experiments.append((model, variable))
+        if (experiment, variable) not in self.data_container.experiments:
+            self.data_container.experiments.append((experiment, variable))
         self.write('ok')
         self.finish()

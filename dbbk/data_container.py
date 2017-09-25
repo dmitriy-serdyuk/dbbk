@@ -1,6 +1,7 @@
 import json
 
 import pandas
+import pickle
 import yaml
 from bokeh.layouts import column, row
 from bokeh.models import ColumnDataSource, Slider, TableColumn, Button
@@ -10,13 +11,22 @@ from .widgets import Figure, AddLine, DragDataTable
 
 
 class DataContainer(object):
+    column_names = ['iteration', 'value', 'experiment', 'variable']
+
     def __init__(self):
-        self.data_frame = pandas.DataFrame(
-            columns=['iteration', 'value', 'model', 'variable'])
+        self.data_frame = pandas.DataFrame(columns=self.column_names)
         self.experiments = []
 
-    def get_points(self, model, variable):
-        filtered = self.data_frame[(self.data_frame.model == model) &
+    def save_state(self, name='dbbk_state.pkl'):
+        with open(name, 'wb') as f:
+            pickle.dump([self.data_frame, self.experiments], f)
+
+    def load_state(self, name='dbbk_state.pkl'):
+        with open(name, 'rb') as f:
+            self.data_frame, self.experiments = pickle.load(f)
+
+    def get_points(self, experiment, variable):
+        filtered = self.data_frame[(self.data_frame.experiment == experiment) &
                                    (self.data_frame.variable == variable)]
         return (filtered['iteration'].as_matrix(),
                 filtered['value'].as_matrix())
@@ -24,19 +34,19 @@ class DataContainer(object):
     def add_line_callback(self, plot, data_sources):
         def callback(ev):
             data = json.loads(ev.data)
-            model = data['model']
+            experiment = data['experiment']
             variable = data['variable']
 
-            iteration, value = self.get_points(model, variable)
+            iteration, value = self.get_points(experiment, variable)
             src = ColumnDataSource(dict(iteration=iteration, value=value))
 
             plot.line('iteration', 'value', source=src,
-                      legend="{}: {}".format(model, variable))
+                      legend="{}: {}".format(experiment, variable))
             plot.legend.click_policy = "hide"
             if plot in data_sources:
-                data_sources[plot].append((src, model, variable))
+                data_sources[plot].append((src, experiment, variable))
             else:
-                data_sources[plot] = [(src, model, variable)]
+                data_sources[plot] = [(src, experiment, variable)]
         return callback
 
     def add_plot_callback(self, plots_layout, data_sources):
@@ -61,9 +71,9 @@ class DataContainer(object):
     def add_update_data_callback(self, data_sources, datastreams_source):
         def update_data():
             for plot, plot_properties in data_sources.items():
-                for source, model, variable in plot_properties:
+                for source, experiment, variable in plot_properties:
                     new_data = {}
-                    iteration, value = self.get_points(model, variable)
+                    iteration, value = self.get_points(experiment, variable)
                     len_diff = (len(iteration) -
                                 len(source.data['iteration']))
                     if len_diff > 0:
@@ -71,11 +81,11 @@ class DataContainer(object):
                         new_data['value'] = value[-len_diff:]
                         source.stream(new_data)
             len_diff = (len(self.experiments) -
-                        len(datastreams_source.data['model']))
+                        len(datastreams_source.data['experiment']))
             if len_diff > 0:
                 new_data = {
-                    'model':
-                        [model for model, _ in self.experiments[-len_diff:]],
+                    'experiment':
+                        [experiment for experiment, _ in self.experiments[-len_diff:]],
                     'variable': [variable for _, variable
                                  in self.experiments[-len_diff:]]}
                 datastreams_source.stream(new_data)
@@ -83,15 +93,14 @@ class DataContainer(object):
 
     def modify_doc(self, doc):
         data_sources = {}
-        datastreams_source = ColumnDataSource(
-            dict(model=[], variable=[]))
+        datastreams_source = ColumnDataSource(dict(experiment=[], variable=[]))
         slider = Slider(start=0, end=30, value=0, step=1, title="Smoothing")
         # TODO: uncomment when smoothing is fixed
         #slider.on_change(
         #    'value', self.add_smoothing_callback(source_smooth, plot))
 
         columns = [
-            TableColumn(field="model", title="Model"),
+            TableColumn(field="experiment", title="Experiment"),
             TableColumn(field="variable", title="Variable")]
         data_table = DragDataTable(
             source=datastreams_source, columns=columns, width=400, height=280)
