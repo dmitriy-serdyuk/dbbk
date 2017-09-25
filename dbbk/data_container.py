@@ -6,7 +6,7 @@ from bokeh.layouts import column, row
 from bokeh.models import ColumnDataSource, Slider, TableColumn, Button
 from bokeh.themes import Theme
 
-from dbbk import Figure, AddLine, DragDataTable
+from .widgets import Figure, AddLine, DragDataTable
 
 
 class DataContainer(object):

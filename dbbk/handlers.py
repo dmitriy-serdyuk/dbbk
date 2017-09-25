@@ -5,7 +5,7 @@ from tornado.web import RequestHandler
 from bokeh.client import pull_session
 from bokeh.embed import server_session
 
-from dbbk.utils import render
+from .utils import render
 
 
 class MainHandler(RequestHandler):
