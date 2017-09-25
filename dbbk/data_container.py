@@ -5,6 +5,7 @@ import pickle
 import yaml
 from bokeh.layouts import column, row
 from bokeh.models import ColumnDataSource, Slider, TableColumn, Button
+from bokeh.palettes import Spectral11
 from bokeh.themes import Theme
 
 from .widgets import Figure, AddLine, DragDataTable
@@ -15,7 +16,7 @@ class DataContainer(object):
 
     def __init__(self):
         self.data_frame = pandas.DataFrame(columns=self.column_names)
-        self.experiments = []
+        self.experiments = []  # [(experiment, variable)]
 
     def save_state(self, name='dbbk_state.pkl'):
         with open(name, 'wb') as f:
@@ -41,7 +42,8 @@ class DataContainer(object):
             src = ColumnDataSource(dict(iteration=iteration, value=value))
 
             plot.line('iteration', 'value', source=src,
-                      legend="{}: {}".format(experiment, variable))
+                      legend="{}: {}".format(experiment, variable),
+                      color=Spectral11[self.experiments.index((experiment, variable))])
             plot.legend.click_policy = "hide"
             if plot in data_sources:
                 data_sources[plot].append((src, experiment, variable))
