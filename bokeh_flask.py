@@ -1,9 +1,11 @@
+#!/usr/bin/env python
 from __future__ import print_function
 import os
 import json
 import pandas
 import yaml
 import jinja2
+import tornado
 
 from tornado.ioloop import IOLoop
 
@@ -16,16 +18,9 @@ from bokeh.server.server import Server
 from bokeh.themes import Theme
 from bokeh.models.widgets import TableColumn, Button
 from bokeh.util.browser import view
-from tornado.wsgi import WSGIContainer
 from tornado.web import FallbackHandler
-from bokeh.plotting import figure
-from bokeh.resources import CDN, INLINE
-from bokeh.embed import file_html
-from bokeh.plotting import curdoc
-from bokeh.util.session_id import generate_session_id
 from bokeh.client import pull_session
 from tornado import gen
-import tornado
 from concurrent.futures import ThreadPoolExecutor
 
 from dbbk import AddLine, Figure, DragDataTable
@@ -154,7 +149,7 @@ class DataContainer(object):
 
 
 class MainHandler(tornado.web.RequestHandler):
-    def initialize(self, data_container):
+    def initialize(self):
         self.thread_pool = ThreadPoolExecutor(4)
 
     @gen.coroutine
@@ -176,15 +171,15 @@ class MainHandler(tornado.web.RequestHandler):
 
 class AddHandler(tornado.web.RequestHandler):
     def initialize(self, data_container):
-        pass
+        self.data_container = data_container
 
     def get(self, model, variable, x, y):
         x = float(x)
         y = float(y)
         new_data = dict(iteration=x, value=y, model=model, variable=variable)
-        data_container.data_frame.loc[len(data_container.data_frame)] = new_data
-        if (model, variable) not in data_container.experiments:
-            data_container.experiments.append((model, variable))
+        self.data_container.data_frame.loc[len(self.data_container.data_frame)] = new_data
+        if (model, variable) not in self.data_container.experiments:
+            self.data_container.experiments.append((model, variable))
         self.write('ok')
         self.finish()
 
@@ -208,7 +203,7 @@ if __name__ == '__main__':
 
     server._tornado.add_handlers(
         r".*", 
-        [(r"/", MainHandler, {'data_container': data_container}), 
+        [(r"/", MainHandler),
          (r"/add/([^/]+)/([^/]+)/([^/]+)/([^/]+)", AddHandler, 
           {'data_container': data_container}),
         ])
