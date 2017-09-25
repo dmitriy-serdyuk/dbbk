@@ -1,7 +1,6 @@
 from __future__ import print_function
 import os
 import json
-from flask import Flask, render_template
 import pandas
 import yaml
 import jinja2
@@ -193,8 +192,6 @@ class AddHandler(tornado.web.RequestHandler):
 if __name__ == '__main__':
     # TODO: make port configurable
     PORT = 8080
-
-    flask_app = Flask(__name__)
 
     data_container = DataContainer()
     bokeh_app = Application(FunctionHandler(data_container.modify_doc))
