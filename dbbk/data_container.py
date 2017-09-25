@@ -15,7 +15,8 @@ from .widgets import Figure, AddLine, DragDataTable
 class DataContainer(object):
     column_names = ['iteration', 'value', 'experiment', 'variable']
 
-    def __init__(self, load_state='dbbk_state.jsonl.gz'):
+    def __init__(self, update_freq, load_state='dbbk_state.jsonl.gz'):
+        self.update_freq = update_freq
         self.data_frame = pandas.DataFrame(columns=self.column_names)
         if isfile(load_state):
             self.load_state(load_state)
@@ -45,13 +46,19 @@ class DataContainer(object):
                     data = line['data']
                     self.data_frame.loc[line['ind']] = [data[col] for col in self.column_names]
 
+    def add_data(self, iteration, value, experiment, variable):
+        new_data = dict(iteration=iteration, value=value, experiment=experiment, variable=variable)
+        self.data_frame.loc[len(self.data_frame)] = new_data
+        if (experiment, variable) not in self.experiments:
+            self.experiments.append((experiment, variable))
+
     def get_points(self, experiment, variable):
         filtered = self.data_frame[(self.data_frame.experiment == experiment) &
                                    (self.data_frame.variable == variable)]
         return (filtered['iteration'].as_matrix(),
                 filtered['value'].as_matrix())
 
-    def add_line_callback(self, plot, data_sources):
+    def create_line_callback(self, plot, data_sources):
         def callback(ev):
             data = json.loads(ev.data)
             experiment = data['experiment']
@@ -60,7 +67,10 @@ class DataContainer(object):
             iteration, value = self.get_points(experiment, variable)
             src = ColumnDataSource(dict(iteration=iteration, value=value))
 
-            plot.line('iteration', 'value', source=src,
+            plot.yaxis.axis_label = variable
+            plot.line('iteration', 'value',
+                      line_width=3,
+                      source=src,
                       legend="{}: {}".format(experiment, variable),
                       color=Spectral11[self.experiments.index((experiment, variable))])
             plot.legend.click_policy = "hide"
@@ -68,30 +78,29 @@ class DataContainer(object):
                 data_sources[plot].append((src, experiment, variable))
             else:
                 data_sources[plot] = [(src, experiment, variable)]
-            # TODO
-            self.save_state()
         return callback
 
-    def add_plot_callback(self, plots_layout, data_sources):
+    def create_add_plot_callback(self, plots_layout, data_sources):
         def callback():
-            plot = Figure(x_axis_type='linear', y_range=(0, 25),
+            plot = Figure(x_axis_type='linear',
                           y_axis_label='value',
                           x_axis_label='iteration')
-            plot.on_event(AddLine, self.add_line_callback(plot, data_sources))
+            plot.on_event(AddLine, self.create_line_callback(plot, data_sources))
             plots_layout.children.append(plot)
         return callback
 
-    def add_smoothing_callback(self, source_smooth, plot):
+    def add_smoothing_callback(self, source_smooth):
         def callback(attr, old, new):
             # TODO: fix smoothing
             if new == 0:
                 data = plot
             else:
-                data = self.df.rolling(new).mean()
+                for experiment, variable in self.experiments:
+                    data = self.df.rolling(new).mean()
             source_smooth.data = ColumnDataSource(data=data).data
         return callback
 
-    def add_update_data_callback(self, data_sources, datastreams_source):
+    def create_update_data_callback(self, data_sources, datastreams_source):
         def update_data():
             for plot, plot_properties in data_sources.items():
                 for source, experiment, variable in plot_properties:
@@ -119,8 +128,8 @@ class DataContainer(object):
         datastreams_source = ColumnDataSource(dict(experiment=[], variable=[]))
         slider = Slider(start=0, end=30, value=0, step=1, title="Smoothing")
         # TODO: uncomment when smoothing is fixed
-        #slider.on_change(
-        #    'value', self.add_smoothing_callback(source_smooth, plot))
+        slider.on_change(
+            'value', self.add_smoothing_callback(data_sources))
 
         columns = [
             TableColumn(field="experiment", title="Experiment"),
@@ -128,18 +137,18 @@ class DataContainer(object):
         data_table = DragDataTable(
             source=datastreams_source, columns=columns, width=400, height=280)
 
-        # TODO: make interval configurable, add refresh button
+        # TODO: add refresh button
         doc.add_periodic_callback(
-            self.add_update_data_callback(data_sources, datastreams_source),
-            6000)
-        doc.add_next_tick_callback(self.add_update_data_callback(data_sources, datastreams_source))
+            self.create_update_data_callback(data_sources, datastreams_source),
+            self.update_freq)
+        doc.add_next_tick_callback(self.create_update_data_callback(data_sources, datastreams_source))
 
         tools_layout = column(slider, data_table)
         add_plot_button = Button(label='Add Plot', button_type="success", name='my_button')
         plots_layout = column(add_plot_button)
 
         add_plot_button.on_click(
-            self.add_plot_callback(plots_layout, data_sources))
+            self.create_add_plot_callback(plots_layout, data_sources))
 
         main_layout = row(tools_layout, plots_layout)
         doc.add_root(main_layout)

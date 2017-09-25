@@ -13,8 +13,8 @@ from dbbk.handlers import MainHandler, AddHandler
 from dbbk.utils import ExtendedServer
 
 
-def main(host, port, open_browser):
-    data_container = DataContainer()
+def main(host, port, open_browser, update_freq):
+    data_container = DataContainer(update_freq)
     bokeh_app = Application(FunctionHandler(data_container.modify_doc))
 
     io_loop = IOLoop.current()
@@ -26,7 +26,7 @@ def main(host, port, open_browser):
 
     server.start()
 
-    print('Start server on http://{}:{}/'.format(host, port))
+    print('.. started server on http://{}:{}/'.format(host, port))
 
     server.add_handlers(
         r".*",
@@ -36,7 +36,12 @@ def main(host, port, open_browser):
 
     if open_browser:
         io_loop.add_callback(view, "http://{}:{}/".format(host, port))
-    io_loop.start()
+    try:
+        io_loop.start()
+    except KeyboardInterrupt:
+        print('.. saving state')
+        data_container.save_state()
+        print('.. shutting down server')
 
 
 if __name__ == '__main__':
@@ -44,6 +49,7 @@ if __name__ == '__main__':
     
     parser.add_argument('--host', type=str, default='localhost')
     parser.add_argument('--port', type=int, default=8080)
+    parser.add_argument('--update-freq', type=int, default=6000)
 
     parser.add_argument('--open-browser', dest='open_browser', action='store_true')
     parser.add_argument('--no-open-browser', dest='open_browser', action='store_false')

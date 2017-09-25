@@ -41,9 +41,6 @@ class AddHandler(RequestHandler):
     def get(self, experiment, variable, x, y):
         x = float(x)
         y = float(y)
-        new_data = dict(iteration=x, value=y, experiment=experiment, variable=variable)
-        self.data_container.data_frame.loc[len(self.data_container.data_frame)] = new_data
-        if (experiment, variable) not in self.data_container.experiments:
-            self.data_container.experiments.append((experiment, variable))
+        self.data_container.add_data(iteration=x, value=y, experiment=experiment, variable=variable)
         self.write('ok')
         self.finish()
