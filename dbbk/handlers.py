@@ -11,13 +11,14 @@ from dbbk.utils import render
 class MainHandler(RequestHandler):
     default_path = r"/"
 
-    def initialize(self):
+    def initialize(self, port):
         self.thread_pool = ThreadPoolExecutor(4)
+        self.port = port
 
     @gen.coroutine
     def get_session(self):
         session = yield self.thread_pool.submit(
-            pull_session, url='http://localhost:{}/bkapp'.format(PORT))
+            pull_session, url='http://localhost:{}/bkapp'.format(self.port))
         return session
 
     @gen.coroutine
@@ -26,7 +27,7 @@ class MainHandler(RequestHandler):
         model = session.document.roots[0]
         script = server_session(
             model, session.id,
-            url='http://localhost:{}/bkapp'.format(PORT))
+            url='http://localhost:{}/bkapp'.format(self.port))
         self.write(render("templates/embed.html", script=script, template="Flask"))
         self.finish()
 

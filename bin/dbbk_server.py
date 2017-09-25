@@ -30,8 +30,8 @@ def main(host, port, open_browser):
 
     server.add_handlers(
         r".*",
-        [(MainHandler.default_path, MainHandler),
-         (AddHandler.default_path, AddHandler, {'data_container': data_container}),
+        [(MainHandler.default_path, MainHandler, dict(port=port)),
+         (AddHandler.default_path, AddHandler, dict(data_container=data_container)),
          ])
 
     if open_browser:
