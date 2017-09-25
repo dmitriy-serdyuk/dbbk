@@ -1,14 +1,16 @@
 from __future__ import print_function
+import os
 import json
 from flask import Flask, render_template
 import pandas
 import yaml
+import jinja2
 
 from tornado.ioloop import IOLoop
 
 from bokeh.application import Application
 from bokeh.application.handlers import FunctionHandler
-from bokeh.embed import server_document
+from bokeh.embed import server_document, server_session
 from bokeh.layouts import column, row
 from bokeh.models import ColumnDataSource, Slider
 from bokeh.server.server import Server
@@ -17,8 +19,24 @@ from bokeh.models.widgets import TableColumn, Button
 from bokeh.util.browser import view
 from tornado.wsgi import WSGIContainer
 from tornado.web import FallbackHandler
+from bokeh.plotting import figure
+from bokeh.resources import CDN, INLINE
+from bokeh.embed import file_html
+from bokeh.plotting import curdoc
+from bokeh.util.session_id import generate_session_id
+from bokeh.client import pull_session
+from tornado import gen
+import tornado
+from concurrent.futures import ThreadPoolExecutor
 
 from dbbk import AddLine, Figure, DragDataTable
+
+
+def render(tpl_path, **context):
+    path, filename = os.path.split(tpl_path)
+    return jinja2.Environment(
+        loader=jinja2.FileSystemLoader(path or './')
+    ).get_template(filename).render(context)
 
 
 class DataContainer(object):
@@ -114,7 +132,7 @@ class DataContainer(object):
             6000)
 
         tools_layout = column(slider, data_table)
-        add_plot_button = Button(label='Add Plot', button_type="success")
+        add_plot_button = Button(label='Add Plot', button_type="success", name='my_button')
         plots_layout = column(add_plot_button)
 
         add_plot_button.on_click(
@@ -136,6 +154,42 @@ class DataContainer(object):
         """))
 
 
+class MainHandler(tornado.web.RequestHandler):
+    def initialize(self, data_container):
+        self.thread_pool = ThreadPoolExecutor(4)
+
+    @gen.coroutine
+    def get_session(self):
+        session = yield self.thread_pool.submit(
+            pull_session, url='http://localhost:{}/bkapp'.format(PORT))
+        return session
+
+    @gen.coroutine
+    def get(self):
+        session = yield self.get_session()
+        model = session.document.roots[0]
+        script = server_session(
+            model, session.id, 
+            url='http://localhost:{}/bkapp'.format(PORT))
+        self.write(render("templates/embed.html", script=script, template="Flask"))
+        self.finish()
+
+
+class AddHandler(tornado.web.RequestHandler):
+    def initialize(self, data_container):
+        pass
+
+    def get(self, model, variable, x, y):
+        x = float(x)
+        y = float(y)
+        new_data = dict(iteration=x, value=y, model=model, variable=variable)
+        data_container.data_frame.loc[len(data_container.data_frame)] = new_data
+        if (model, variable) not in data_container.experiments:
+            data_container.experiments.append((model, variable))
+        self.write('ok')
+        self.finish()
+
+
 if __name__ == '__main__':
     # TODO: make port configurable
     PORT = 8080
@@ -153,25 +207,14 @@ if __name__ == '__main__':
 
     server.start()
 
-    @flask_app.route('/', methods=['GET'])
-    def bkapp_page():
-        script = server_document(url='http://localhost:{}/bkapp'.format(PORT))
-        return render_template("embed.html", script=script, template="Flask")
-
-    @flask_app.route('/add/<model>/<variable>/<x>/<y>', methods=['GET'])
-    def add_data(model, variable, x, y):
-        new_data = dict(iteration=x, value=y, model=model, variable=variable)
-        data_container.data_frame.loc[len(data_container.data_frame)] = new_data
-        if (model, variable) not in data_container.experiments:
-            data_container.experiments.append((model, variable))
-        return "", 200
-
     print('Start server on http://localhost:{}/'.format(PORT))
 
     server._tornado.add_handlers(
         r".*", 
-        [("^(?!/bkapp|/static).*$", FallbackHandler, 
-         dict(fallback=WSGIContainer(flask_app)))])
+        [(r"/", MainHandler, {'data_container': data_container}), 
+         (r"/add/([^/]+)/([^/]+)/([^/]+)/([^/]+)", AddHandler, 
+          {'data_container': data_container}),
+        ])
 
     io_loop.add_callback(view, "http://localhost:{}/".format(PORT))
     io_loop.start()
