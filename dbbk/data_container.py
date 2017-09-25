@@ -1,8 +1,9 @@
+import gzip
 import json
-
 import pandas
 import pickle
 import yaml
+from os.path import isfile
 from bokeh.layouts import column, row
 from bokeh.models import ColumnDataSource, Slider, TableColumn, Button
 from bokeh.palettes import Spectral11
@@ -14,17 +15,35 @@ from .widgets import Figure, AddLine, DragDataTable
 class DataContainer(object):
     column_names = ['iteration', 'value', 'experiment', 'variable']
 
-    def __init__(self):
+    def __init__(self, load_state='dbbk_state.jsonl.gz'):
         self.data_frame = pandas.DataFrame(columns=self.column_names)
-        self.experiments = []  # [(experiment, variable)]
+        if isfile(load_state):
+            self.load_state(load_state)
+        else:
+            print('.. did not find saved state')
+            self.experiments = []  # [(experiment, variable)]
 
-    def save_state(self, name='dbbk_state.pkl'):
+    def save_state(self, name='dbbk_state.jsonl.gz'):
         with open(name, 'wb') as f:
             pickle.dump([self.data_frame, self.experiments], f)
+        with gzip.open(name, 'wb') as f:
+            f.write(json.dumps({'experiments': self.experiments}).encode())
+            f.write('\n'.encode())
 
-    def load_state(self, name='dbbk_state.pkl'):
-        with open(name, 'rb') as f:
-            self.data_frame, self.experiments = pickle.load(f)
+            for ind, row in self.data_frame.iterrows():
+                f.write(json.dumps(dict(ind=int(ind), data=json.loads(row.to_json()))).encode())
+                f.write('\n'.encode())
+
+    def load_state(self, name='dbbk_state.jsonl.gz'):
+        with gzip.open(name, 'rb') as f:
+            print('.. loading data from ', name)
+            for line in f:
+                line = json.loads(line.decode())
+                if 'experiments' in line:
+                    self.experiments = [tuple(exp) for exp in line['experiments']]
+                if 'data' in line:
+                    data = line['data']
+                    self.data_frame.loc[line['ind']] = [data[col] for col in self.column_names]
 
     def get_points(self, experiment, variable):
         filtered = self.data_frame[(self.data_frame.experiment == experiment) &
@@ -49,6 +68,8 @@ class DataContainer(object):
                 data_sources[plot].append((src, experiment, variable))
             else:
                 data_sources[plot] = [(src, experiment, variable)]
+            # TODO
+            self.save_state()
         return callback
 
     def add_plot_callback(self, plots_layout, data_sources):
@@ -111,6 +132,7 @@ class DataContainer(object):
         doc.add_periodic_callback(
             self.add_update_data_callback(data_sources, datastreams_source),
             6000)
+        doc.add_next_tick_callback(self.add_update_data_callback(data_sources, datastreams_source))
 
         tools_layout = column(slider, data_table)
         add_plot_button = Button(label='Add Plot', button_type="success", name='my_button')
