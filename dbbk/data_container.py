@@ -1,11 +1,13 @@
 import gzip
 import json
+import numpy
 import pandas
 import pickle
 import yaml
 from os.path import isfile
 from bokeh.layouts import column, row
-from bokeh.models import ColumnDataSource, Slider, TableColumn, Button
+from bokeh.models import ColumnDataSource, Slider, TableColumn, Button, Band
+from bokeh.models.tools import HoverTool
 from bokeh.palettes import Spectral11
 from bokeh.themes import Theme
 
@@ -58,7 +60,7 @@ class DataContainer(object):
         return (filtered['iteration'].as_matrix(),
                 filtered['value'].as_matrix())
 
-    def create_line_callback(self, plot, data_sources):
+    def create_line_callback(self, plot, data_sources, slider):
         def callback(ev):
             data = json.loads(ev.data)
             experiment = data['experiment']
@@ -66,13 +68,25 @@ class DataContainer(object):
 
             iteration, value = self.get_points(experiment, variable)
             src = ColumnDataSource(dict(iteration=iteration, value=value))
+            src = self.smooth_frame(src, int(slider.value))
 
             plot.yaxis.axis_label = variable
-            plot.line('iteration', 'value',
+            color = Spectral11[self.experiments.index((experiment, variable))]
+            plot.line('iteration', 'value_mean',
                       line_width=3,
                       source=src,
+                      color=color)
+            plot.line('iteration', 'value',
+                      line_width=1,
+                      alpha=0.7,
+                      source=src,
                       legend="{}: {}".format(experiment, variable),
-                      color=Spectral11[self.experiments.index((experiment, variable))])
+                      color=color)
+
+            band = Band(base='iteration', lower='lower', upper='upper', source=src, level='underlay',
+                        fill_alpha=0.3, line_width=0, line_color=color, fill_color=color)
+            plot.add_layout(band)
+
             plot.legend.click_policy = "hide"
             if plot in data_sources:
                 data_sources[plot].append((src, experiment, variable))
@@ -80,27 +94,42 @@ class DataContainer(object):
                 data_sources[plot] = [(src, experiment, variable)]
         return callback
 
-    def create_add_plot_callback(self, plots_layout, data_sources):
+    def create_add_plot_callback(self, plots_layout, data_sources, slider):
         def callback():
             plot = Figure(x_axis_type='linear',
                           y_axis_label='value',
                           x_axis_label='iteration')
-            plot.on_event(AddLine, self.create_line_callback(plot, data_sources))
+            plot.on_event(AddLine, self.create_line_callback(plot, data_sources, slider))
             plots_layout.children.append(plot)
         return callback
 
-    def add_smoothing_callback(self, source_smooth):
+    def smooth_frame(self, source, window_size):
+        df = pandas.DataFrame(data=source.data).sort_values(by="iteration")
+        df = df[['iteration', 'value']]
+        if window_size > 0:
+            series = df.value.rolling(window_size)
+            means = series.mean().fillna(method='bfill').reset_index()['value'].rename('value_mean')
+            stds = series.std().fillna(method='bfill').reset_index()['value'].rename('value_std')
+        else:
+            means = df['value'].rename('value_mean')
+            stds = (df['value'] * 0).rename('value_std')
+        df = pandas.concat([df, means, stds], axis=1)
+
+        df['lower'] = df.value_mean - df.value_std
+        df['upper'] = df.value_mean + df.value_std
+
+        source = ColumnDataSource(df)
+        return source
+
+    def add_smoothing_callback(self, data_sources):
         def callback(attr, old, new):
-            # TODO: fix smoothing
-            if new == 0:
-                data = plot
-            else:
-                for experiment, variable in self.experiments:
-                    data = self.df.rolling(new).mean()
-            source_smooth.data = ColumnDataSource(data=data).data
+            for plot, plot_properties in data_sources.items():
+                for source, experiment, variable in plot_properties:
+                    source.data = self.smooth_frame(source, int(new)).data
+
         return callback
 
-    def create_update_data_callback(self, data_sources, datastreams_source):
+    def create_update_data_callback(self, data_sources, datastreams_source, slider):
         def update_data():
             for plot, plot_properties in data_sources.items():
                 for source, experiment, variable in plot_properties:
@@ -111,15 +140,20 @@ class DataContainer(object):
                     if len_diff > 0:
                         new_data['iteration'] = iteration[-len_diff:]
                         new_data['value'] = value[-len_diff:]
+
+                        new_data['upper'] = value[-len_diff:]
+                        new_data['lower'] = value[-len_diff:]
+
                         source.stream(new_data)
+                    source.data = self.smooth_frame(source, int(slider.value)).data
             len_diff = (len(self.experiments) -
                         len(datastreams_source.data['experiment']))
             if len_diff > 0:
                 new_data = {
                     'experiment':
                         [experiment for experiment, _ in self.experiments[-len_diff:]],
-                    'variable': [variable for _, variable
-                                 in self.experiments[-len_diff:]]}
+                    'variable':
+                        [variable for _, variable in self.experiments[-len_diff:]]}
                 datastreams_source.stream(new_data)
         return update_data
 
@@ -127,9 +161,6 @@ class DataContainer(object):
         data_sources = {}
         datastreams_source = ColumnDataSource(dict(experiment=[], variable=[]))
         slider = Slider(start=0, end=30, value=0, step=1, title="Smoothing")
-        # TODO: uncomment when smoothing is fixed
-        slider.on_change(
-            'value', self.add_smoothing_callback(data_sources))
 
         columns = [
             TableColumn(field="experiment", title="Experiment"),
@@ -139,16 +170,17 @@ class DataContainer(object):
 
         # TODO: add refresh button
         doc.add_periodic_callback(
-            self.create_update_data_callback(data_sources, datastreams_source),
+            self.create_update_data_callback(data_sources, datastreams_source, slider),
             self.update_freq)
-        doc.add_next_tick_callback(self.create_update_data_callback(data_sources, datastreams_source))
+        doc.add_next_tick_callback(self.create_update_data_callback(data_sources, datastreams_source, slider))
 
         tools_layout = column(slider, data_table)
         add_plot_button = Button(label='Add Plot', button_type="success", name='my_button')
         plots_layout = column(add_plot_button)
+        slider.on_change('value', self.add_smoothing_callback(data_sources))
 
         add_plot_button.on_click(
-            self.create_add_plot_callback(plots_layout, data_sources))
+            self.create_add_plot_callback(plots_layout, data_sources, slider))
 
         main_layout = row(tools_layout, plots_layout)
         doc.add_root(main_layout)
