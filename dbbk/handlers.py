@@ -12,8 +12,8 @@ class MainHandler(RequestHandler):
     default_path = r"/"
 
     def initialize(self, port):
-        self.thread_pool = ThreadPoolExecutor(4)
         self.port = port
+        self.thread_pool = ThreadPoolExecutor(2)
 
     @gen.coroutine
     def get_session(self):
