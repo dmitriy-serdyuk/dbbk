@@ -1,17 +1,34 @@
 import gzip
 import json
-import numpy
 import pandas
 import pickle
 import yaml
 from os.path import isfile
 from bokeh.layouts import column, row
 from bokeh.models import ColumnDataSource, Slider, TableColumn, Button, Band
-from bokeh.models.tools import HoverTool
 from bokeh.palettes import Spectral11
 from bokeh.themes import Theme
 
 from .widgets import Figure, AddLine, DragDataTable
+
+
+def smooth_frame(source, window_size):
+    df = pandas.DataFrame(data=source.data).sort_values(by="iteration")
+    df = df[['iteration', 'value']]
+    if window_size > 0:
+        series = df.value.rolling(window_size)
+        means = series.mean().fillna(method='bfill').reset_index()['value'].rename('value_mean')
+        stds = series.std().fillna(method='bfill').reset_index()['value'].rename('value_std')
+    else:
+        means = df['value'].rename('value_mean')
+        stds = (df['value'] * 0).rename('value_std')
+    df = pandas.concat([df, means, stds], axis=1)
+
+    df['lower'] = df.value_mean - df.value_std
+    df['upper'] = df.value_mean + df.value_std
+
+    source = ColumnDataSource(df)
+    return source
 
 
 class DataContainer(object):
@@ -68,7 +85,7 @@ class DataContainer(object):
 
             iteration, value = self.get_points(experiment, variable)
             src = ColumnDataSource(dict(iteration=iteration, value=value))
-            src = self.smooth_frame(src, int(slider.value))
+            src = smooth_frame(src, int(slider.value))
 
             plot.yaxis.axis_label = variable
             color = Spectral11[self.experiments.index((experiment, variable))]
@@ -111,29 +128,11 @@ class DataContainer(object):
             plots_layout.children.append(plot)
         return callback
 
-    def smooth_frame(self, source, window_size):
-        df = pandas.DataFrame(data=source.data).sort_values(by="iteration")
-        df = df[['iteration', 'value']]
-        if window_size > 0:
-            series = df.value.rolling(window_size)
-            means = series.mean().fillna(method='bfill').reset_index()['value'].rename('value_mean')
-            stds = series.std().fillna(method='bfill').reset_index()['value'].rename('value_std')
-        else:
-            means = df['value'].rename('value_mean')
-            stds = (df['value'] * 0).rename('value_std')
-        df = pandas.concat([df, means, stds], axis=1)
-
-        df['lower'] = df.value_mean - df.value_std
-        df['upper'] = df.value_mean + df.value_std
-
-        source = ColumnDataSource(df)
-        return source
-
     def add_smoothing_callback(self, data_sources):
         def callback(attr, old, new):
             for plot, plot_properties in data_sources.items():
                 for source, experiment, variable in plot_properties:
-                    source.data = self.smooth_frame(source, int(new)).data
+                    source.data = smooth_frame(source, int(new)).data
 
         return callback
 
@@ -153,7 +152,7 @@ class DataContainer(object):
                         new_data['lower'] = value[-len_diff:]
 
                         source.stream(new_data)
-                    source.data = self.smooth_frame(source, int(slider.value)).data
+                    source.data = smooth_frame(source, int(slider.value)).data
             len_diff = (len(self.experiments) -
                         len(datastreams_source.data['experiment']))
             if len_diff > 0:
