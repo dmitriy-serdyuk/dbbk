@@ -72,20 +72,28 @@ class DataContainer(object):
 
             plot.yaxis.axis_label = variable
             color = Spectral11[self.experiments.index((experiment, variable))]
-            plot.line('iteration', 'value_mean',
-                      line_width=3,
-                      source=src,
-                      color=color)
-            plot.line('iteration', 'value',
-                      line_width=1,
-                      alpha=0.7,
-                      source=src,
-                      legend="{}: {}".format(experiment, variable),
-                      color=color)
+            line_mean = plot.line(
+                'iteration', 'value_mean',
+                line_width=3,
+                source=src,
+                legend="{}: {}".format(experiment, variable),
+                color=color)
+            line = plot.line(
+                'iteration', 'value',
+                line_width=1,
+                alpha=0.7,
+                source=src,
+                color=color)
 
             band = Band(base='iteration', lower='lower', upper='upper', source=src, level='underlay',
                         fill_alpha=0.3, line_width=0, line_color=color, fill_color=color)
             plot.add_layout(band)
+
+            def flip_visible(attr, old, new):
+                line.visible = new
+                band.visible = new
+
+            line_mean.on_change('visible', flip_visible)
 
             plot.legend.click_policy = "hide"
             if plot in data_sources:
