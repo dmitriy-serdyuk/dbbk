@@ -12,14 +12,14 @@ from .utils import render
 class MainHandler(RequestHandler):
     default_path = r"/"
 
-    def initialize(self, port):
-        self.port = port
+    def initialize(self, bokeh_server):
         self.thread_pool = ThreadPoolExecutor(2)
+        self.bokeh_server = bokeh_server
 
     @gen.coroutine
     def get_session(self):
         session = yield self.thread_pool.submit(
-            pull_session, url='http://localhost:{}/bkapp'.format(self.port))
+            pull_session, url=self.bokeh_server)
         return session
 
     @gen.coroutine
@@ -28,7 +28,7 @@ class MainHandler(RequestHandler):
         root_model = session.document.roots[0]
         script = server_session(
             root_model, session.id,
-            url='http://localhost:{}/bkapp'.format(self.port))
+            url=self.bokeh_server)
         self.write(render(split(__file__)[0] + "/templates/embed.html", script=script, template="Flask"))
         self.finish()
 

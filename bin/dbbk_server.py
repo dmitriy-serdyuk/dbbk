@@ -13,7 +13,10 @@ from dbbk.handlers import MainHandler, AddHandler
 from dbbk.utils import ExtendedServer
 
 
-def main(host, port, open_browser, update_freq):
+def main(host, port, open_browser, update_freq, embed_bokeh):
+    if not embed_bokeh:
+        raise NotImplementedError
+
     data_container = DataContainer(update_freq)
     bokeh_app = Application(FunctionHandler(data_container.modify_doc))
 
@@ -30,8 +33,10 @@ def main(host, port, open_browser, update_freq):
 
     server.add_handlers(
         r".*",
-        [(MainHandler.default_path, MainHandler, dict(port=port)),
-         (AddHandler.default_path, AddHandler, dict(data_container=data_container)),
+        [(MainHandler.default_path, MainHandler,
+          dict(bokeh_server='http://localhost:{}/bkapp'.format(port))),
+         (AddHandler.default_path, AddHandler,
+          dict(data_container=data_container)),
          ])
 
     if open_browser:
@@ -49,11 +54,17 @@ if __name__ == '__main__':
     
     parser.add_argument('--host', type=str, default='localhost')
     parser.add_argument('--port', type=int, default=8080)
-    parser.add_argument('--update-freq', type=int, default=6000)
+    parser.add_argument('--update-freq', type=int, default=6000,
+                        help="Update frequency in milliseconds")
 
     parser.add_argument('--open-browser', dest='open_browser', action='store_true')
     parser.add_argument('--no-open-browser', dest='open_browser', action='store_false')
     parser.set_defaults(open_browser=True)
+
+    parser.add_argument('--embed-bokeh', dest='embed_bokeh', action='store_true',
+                        help='Run bokeh server')
+    parser.add_argument('--no-embed-bokeh', dest='embed_bokeh', action='store_false')
+    parser.set_defaults(embed_bokeh=True)
 
     args = parser.parse_args()
     main(**args.__dict__)
