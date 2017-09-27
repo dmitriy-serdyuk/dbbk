@@ -2,7 +2,7 @@ from os.path import split
 from concurrent.futures import ThreadPoolExecutor
 
 from tornado import gen
-from tornado.web import RequestHandler
+from tornado.web import RequestHandler, asynchronous
 from bokeh.client import pull_session
 from bokeh.embed import server_session
 
@@ -39,9 +39,15 @@ class AddHandler(RequestHandler):
     def initialize(self, data_container):
         self.data_container = data_container
 
+    @gen.coroutine
+    def add_data(self, iteration, value, experiment, variable):
+        self.data_container.add_data(iteration=iteration, value=value, experiment=experiment, variable=variable)
+
+    @asynchronous
+    @gen.engine
     def get(self, experiment, variable, x, y):
         x = float(x)
         y = float(y)
-        self.data_container.add_data(iteration=x, value=y, experiment=experiment, variable=variable)
+        self.add_data(iteration=x, value=y, experiment=experiment, variable=variable)
         self.write('ok')
         self.finish()
