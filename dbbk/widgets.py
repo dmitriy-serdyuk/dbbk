@@ -9,12 +9,12 @@ from bokeh.plotting import Figure
 
 class DragDataTable(DataTable):
     __implementation__ = (dirname(realpath(__file__)) +
-                          '/../coffee/drag_data_table.coffee')
+                          '/coffee/drag_data_table.coffee')
 
 
 class DropPlot(Plot):
     __implementation__ = (dirname(realpath(__file__)) +
-                          '/../coffee/drop_plot.coffee')
+                          '/coffee/drop_plot.coffee')
 
 
 class AddLine(Event):

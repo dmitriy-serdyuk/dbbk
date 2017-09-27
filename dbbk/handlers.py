@@ -1,3 +1,4 @@
+from os.path import split
 from concurrent.futures import ThreadPoolExecutor
 
 from tornado import gen
@@ -28,7 +29,7 @@ class MainHandler(RequestHandler):
         script = server_session(
             root_model, session.id,
             url='http://localhost:{}/bkapp'.format(self.port))
-        self.write(render("templates/embed.html", script=script, template="Flask"))
+        self.write(render(split(__file__)[0] + "/templates/embed.html", script=script, template="Flask"))
         self.finish()
 
 
