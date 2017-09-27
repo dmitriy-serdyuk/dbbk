@@ -17,14 +17,17 @@ class MainHandler(RequestHandler):
         self.bokeh_server = bokeh_server
 
     @gen.coroutine
-    def get_session(self):
+    def get_session(self, session_id):
         session = yield self.thread_pool.submit(
-            pull_session, url=self.bokeh_server)
+            pull_session, session_id=session_id, url=self.bokeh_server)
         return session
 
     @gen.coroutine
     def get(self):
-        session = yield self.get_session()
+        session_id = self.get_cookie('session_id')
+        session = yield self.get_session(session_id)
+        session_id = session.id
+        self.set_cookie('session_id', session_id)
         root_model = session.document.roots[0]
         script = server_session(
             root_model, session.id,
