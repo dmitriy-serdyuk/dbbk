@@ -15,7 +15,7 @@ from .widgets import Figure, AddLine, DragDataTable
 def smooth_frame(source, window_size):
     df = pandas.DataFrame(data=source.data).sort_values(by="iteration")
     df = df[['iteration', 'value']]
-    if window_size > 0:
+    if window_size > 1:
         series = df.value.rolling(window_size)
         means = series.mean().fillna(method='bfill').reset_index()['value'].rename('value_mean')
         stds = series.std().fillna(method='bfill').reset_index()['value'].rename('value_std')
@@ -27,7 +27,7 @@ def smooth_frame(source, window_size):
     df['lower'] = df.value_mean - df.value_std
     df['upper'] = df.value_mean + df.value_std
 
-    source = ColumnDataSource(df)
+    source = ColumnDataSource({k: v.as_matrix() for k, v in df.to_dict(orient='series').items()})
     return source
 
 
@@ -148,6 +148,8 @@ class DataContainer(object):
                         new_data['iteration'] = iteration[-len_diff:]
                         new_data['value'] = value[-len_diff:]
 
+                        new_data['value_mean'] = value[-len_diff:]
+                        new_data['value_std'] = value[-len_diff:]
                         new_data['upper'] = value[-len_diff:]
                         new_data['lower'] = value[-len_diff:]
 
