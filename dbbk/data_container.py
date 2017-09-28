@@ -12,9 +12,11 @@ from bokeh.themes import Theme
 from .widgets import Figure, AddLine, DragDataTable
 
 
-def smooth_frame(source, window_size):
+def smooth_frame(source, slider_value):
     df = pandas.DataFrame(data=source.data).sort_values(by="iteration")
     df = df[['iteration', 'value']]
+    total_length = len(df)
+    window_size = int(float(total_length) / 100. * slider_value)
     if window_size > 1:
         series = df.value.rolling(window_size)
         means = series.mean().fillna(method='bfill').reset_index()['value'].rename('value_mean')
