@@ -91,14 +91,14 @@ class DataContainer(object):
             color = Spectral11[self.experiments.index((experiment, variable))]
             line_mean = plot.line(
                 'iteration', 'value_mean',
-                line_width=3,
+                line_width=5,
                 source=src,
                 legend="{}: {}".format(experiment, variable),
                 color=color)
             line = plot.line(
                 'iteration', 'value',
                 line_width=1,
-                alpha=0.7,
+                alpha=0.2,
                 source=src,
                 color=color)
 
