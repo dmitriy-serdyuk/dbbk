@@ -23,12 +23,16 @@ export class DropPlotView extends PlotView
         ev.preventDefault()
 
     drop: (ev) ->
+        @render()
         ev.preventDefault()
-        @model.document.event_manager.send_event({
-            "event_name": "add_line", 
-            "event_values" : {
-                "model_id": @model.ref().id,
-                "data": ev.dataTransfer.getData("text")}})
+        model_id = @model.ref().id
+        for doc in Bokeh.documents
+          if doc.get_model_by_id(model_id)
+            @model.document.event_manager.send_event({
+                "event_name": "add_line",
+                "event_values" : {
+                    "model_id": model_id,
+                    "data": ev.dataTransfer.getData("text")}})
 
 export class DropPlot extends Plot
     type: 'DropPlot'
